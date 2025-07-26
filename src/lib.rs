@@ -195,7 +195,6 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::ops::{Deref, DerefMut};
-use std::ptr;
 
 /// Controls in which cases the associated code should be run
 pub trait Strategy {
@@ -359,7 +358,7 @@ where
         // so `ptr::read` the value and forget the guard.
         let mut guard = ManuallyDrop::new(guard);
         unsafe {
-            let value = ptr::read(&*guard.value);
+            let value = ManuallyDrop::take(&mut guard.value);
             // Drop the closure after `value` has been read, so that if the
             // closure's `drop` function panics, unwinding still tries to drop
             // `value`.
@@ -470,7 +469,7 @@ where
     fn drop(&mut self) {
         // This is OK because the fields are `ManuallyDrop`s
         // which will not be dropped by the compiler.
-        let (value, dropfn) = unsafe { (ptr::read(&*self.value), ptr::read(&*self.dropfn)) };
+        let (value, dropfn) = unsafe { (ManuallyDrop::take(&mut self.value), ManuallyDrop::take(&mut self.dropfn)) };
         if S::should_run() {
             dropfn(value);
         }
